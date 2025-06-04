@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>All-in-One Video Downloader</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; }
+    input, select, button { padding: 10px; font-size: 16px; margin: 10px 0; width: 100%; }
+    video, img { max-width: 100%; margin-top: 20px; }
+    .download-link { display: inline-block; margin-top: 10px; background: #0f0; color: #000; padding: 10px 15px; text-decoration: none; border-radius: 5px; }
+    .quality-btn { margin-right: 10px; padding: 6px 12px; background: #222; border: none; color: #eee; cursor: pointer; border-radius: 5px; }
+    .quality-btn.active { background: #0f0; color: #000; }
+  </style>
+</head>
+<body>
+  <h2>🎥 All-in-One Video Downloader</h2>
+  <input type="text" id="url" placeholder="🔗 Paste your link here" />
+  <select id="platform">
+    <option value="instagram">Instagram</option>
+    <option value="youtube">YouTube MP4</option>
+    <option value="ytmp3">YouTube MP3</option>
+    <option value="pinterest">Pinterest</option>
+    <option value="spotify">Spotify</option>
+    <option value="facebook">Facebook</option>
+  </select>
+  <button onclick="downloadMedia()">🔍 Get Download Link</button>
+
+  <div id="result"></div>
+
+  <script>
+    let facebookDownloads = [];
+    let selectedQuality = null;
+
+    async function downloadMedia() {
+      const url = document.getElementById('url').value.trim();
+      const platform = document.getElementById('platform').value;
+      const result = document.getElementById('result');
+      result.innerHTML = "⏳ Please wait...";
+
+      try {
+        let res, data, preview, link;
+
+        if (platform === 'instagram') {
+          res = await fetch(`/api/instagram?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+          link = data.downloadUrl;
+          preview = `<video controls src="${link}" autoplay muted></video>`;
+
+        } else if (platform === 'youtube') {
+          res = await fetch(`/api/youtubeMp4?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+          link = data.result.download_url;
+          preview = `<video controls src="${link}" autoplay muted></video>`;
+
+        } else if (platform === 'ytmp3') {
+          res = await fetch(`/api/youtubeMp3?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+          preview = `
+            <img src="${data.result.thumbnail}" style="max-width:100%" />
+            <p>${data.result.title}</p>
+            <audio controls src="${data.result.download_url}"></audio>
+          `;
+          link = data.result.download_url;
+
+        } else if (platform === 'spotify') {
+          res = await fetch(`/api/spotify?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+          preview = `
+            <img src="${data.thumbnail}" style="max-width:100%" />
+            <p>${data.title} - ${data.channel}</p>
+            <audio controls src="${data.DownloadLink}"></audio>
+          `;
+          link = data.DownloadLink;
+
+        } else if (platform === 'pinterest') {
+          res = await fetch(`/api/pinterest?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+
+          if (data.success && data.result.media.length > 0) {
+            const media = data.result.media[0];
+            if (media.format === 'mp4') {
+              preview = `<video controls src="${media.download_url}" autoplay muted></video>`;
+              link = media.download_url;
+            } else {
+              preview = `<img src="${media.download_url}" />`;
+              link = media.download_url;
+            }
+          } else if (data.BK9 && data.BK9.length > 0) {
+            const media = data.BK9[0];
+            if (media.url.endsWith('.mp4')) {
+              preview = `<video controls src="${media.url}" autoplay muted></video>`;
+              link = media.url;
+            } else {
+              preview = `<img src="${media.url}" />`;
+              link = media.url;
+            }
+          } else {
+            throw 'No media found';
+          }
+
+        } else if (platform === 'facebook') {
+          res = await fetch(`/api/facebook?url=${encodeURIComponent(url)}`);
+          data = await res.json();
+
+          if (data.status && data.video && data.video.downloads.length > 0) {
+            facebookDownloads = data.video.downloads;
+            selectedQuality = facebookDownloads[0].downloadUrl;
+
+            let qualityButtons = facebookDownloads.map((d, i) => {
+              return `<button class="quality-btn ${i===0 ? 'active' : ''}" onclick="selectQuality(${i})">${d.quality}</button>`;
+            }).join('');
+
+            preview = `
+              <video controls src="${selectedQuality}" autoplay muted></video>
+              <div>${qualityButtons}</div>
+            `;
+            link = selectedQuality;
+          } else {
+            throw 'No Facebook video found';
+          }
+        }
+
+        result.innerHTML = `
+          ${preview}
+          <a class="download-link" href="${link}" download>⬇️ Download</a>
+        `;
+      } catch (err) {
+        result.innerHTML = `❌ Failed to fetch download link.`;
+        console.error(err);
+      }
+    }
+
+    function selectQuality(index) {
+      selectedQuality = facebookDownloads[index].downloadUrl;
+      const video = document.querySelector('video');
+      const downloadLink = document.querySelector('.download-link');
+
+      if (video) {
+        video.src = selectedQuality;
+        video.play();
+      }
+      if (downloadLink) {
+        downloadLink.href = selectedQuality;
+      }
+
+      document.querySelectorAll('.quality-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+      });
+    }
+  </script>
+</body>
+</html>
